@@ -1,22 +1,16 @@
 #include "map.hpp"
 
 //constructor, choose file path, tile render width and height, and the characters used in parsing
-Map::Map(char* file_path, float tile_w, float tile_h, char air, char solid, char spawn) {
+Map::Map(char* file_path, float tile_w, float tile_h) {
 	Map::map_file_path = file_path;
 
 	Map::tile_w = tile_w;
 	Map::tile_h = tile_h;
 
-	Map::air = air;
-	Map::solid = solid;
-	Map::spawn = spawn;
-
 	Map::map_file.open(file_path);
 	if (!map_file.is_open()) {
 		throw std::runtime_error("Inavlid path to map file");
 	}
-	_find_max();
-	_find_spawn();
 }
 
 //used to find the longest line in the file
@@ -35,18 +29,39 @@ void Map::_find_max(void) {
 
 //finds the last spawn point listed in the file
 void Map::_find_spawn(void) {
+	//don't you just love for loops?
 	for (int i = 0; i < lines.size(); i++) {
 		for (int j = 0; j < lines.at(i).size(); j++) {
-			if (lines.at(i).at(j) == Map::spawn) {
-				Map::spawn_x = j * tile_w;
-				Map::spawn_y = i * tile_h;
+
+			for (int k = 0; k < tile_types.size(); k++) {
+				if (tile_types.at(k).identifier == lines.at(i).at(j) &&
+					tile_types.at(k).is_spawn) {
+					Map::spawn_x = j * tile_w;
+					Map::spawn_y = i * tile_h;
+					return;
+				}
 			}
+
 		}
 	}
 }
 
+void Map::parse_map() {
+	_map_parsed = true;
+	_find_max();
+	_find_spawn();
+}
+
+void Map::add_tile_type(TileType tile_type) {
+	tile_types.push_back(tile_type);
+}
+
 //renders the map with an optional offset
 void Map::render_map(float offset_x, float offset_y) {
+
+	if (!_map_parsed) {
+		throw std::runtime_error("Map has not been parsed! call parse_map to parse.");
+	}
 
 	for (int i = 0; i < max_h; i++) {
 		for (int j = 0; j < max_w; j++) {
@@ -56,52 +71,78 @@ void Map::render_map(float offset_x, float offset_y) {
 			} else {
 				tile = lines.at(i).at(j);
 			}
-			ALLEGRO_COLOR color;
+			TileType temp;
 
-			if (tile == air) {
-				color = al_map_rgb(255, 255, 255);
-			} else if (tile == solid) {
-				color = al_map_rgb(0, 0, 0);
-			} else if (tile == spawn) {
-				color = al_map_rgb(255, 255, 255);
-			} else {
-				color = al_map_rgb(255, 255, 255);
+			for (int k = 0; k < tile_types.size(); k++) {
+				if (tile_types.at(k).identifier == tile) {
+					temp = tile_types.at(k);
+				}
 			}
 
-			al_draw_filled_rectangle(
-				(j * tile_w) + offset_x,
-				(i * tile_h) + offset_y,
-				((j * tile_w) + tile_w) + offset_x, 
-				((i * tile_h) + tile_h) + offset_y, color);
+			if (temp.identifier == NULL) {
+				temp = TileType('?', false, al_map_rgb(220, 66, 244));
+			}
+
+			if (temp.draw_wireframe) {
+				al_draw_rectangle(
+					(j * tile_w) + offset_x,
+					(i * tile_h) + offset_y,
+					((j * tile_w) + tile_w) + offset_x,
+					((i * tile_h) + tile_h) + offset_y, temp.color, 3.0);
+			} else {
+				al_draw_filled_rectangle(
+					(j * tile_w) + offset_x,
+					(i * tile_h) + offset_y,
+					((j * tile_w) + tile_w) + offset_x,
+					((i * tile_h) + tile_h) + offset_y, temp.color);
+			}
 		}
 	}
 }
 
 //used to get the tile type at a given location
-char Map::get_tile_type_at(float x, float y) {
+TileType Map::get_tile_type_at(float x, float y, float offset_x, float offset_y) {
 	//round the x y coords given and divide them to grab the tile from the map array
-	int x_con = int((x / tile_w));
-	int y_con = int((y / tile_w));
+	int x_con = int(((x + offset_x) / tile_w));
+	int y_con = int(((y + offset_y) / tile_w));
 
 	//if they are behind the map return air
 	if (y < 0 || x < 0) {
-		return air;
+		for (int i = 0; i < tile_types.size(); i++) {
+			if (!tile_types.at(i).is_solid) {
+				return tile_types.at(i);
+			}
+		}
 	}
 	//if they are outside of it return solid
 	if (x_con > max_w || y_con > max_h - 1) {
-		return solid;
+		for (int i = 0; i < tile_types.size(); i++) {
+			if (tile_types.at(i).is_solid) {
+				return tile_types.at(i);
+			}
+		}
 	}
-	return lines.at(y_con).at(x_con);
+
+	for (int i = 0; i < tile_types.size(); i++) {
+		if (tile_types.at(i).identifier == lines.at(y_con).at(x_con)) {
+			return tile_types.at(i);
+		}
+	}
+
+	return TileType();
 }
 
 //used to return the tile at a given location
-Tile Map::get_tile_at(float x, float y) {
+Tile Map::get_tile_at(float x, float y, float offset_x, float offset_y) {
 	//round the x y coords given 
-	int x_con = int((x / tile_w)) * tile_w;
-	int y_con = int((y / tile_h)) * tile_h;
+	int x_con = (int(((x + offset_x) / tile_w)) * tile_w);
+	int y_con = (int(((y + offset_y) / tile_h)) * tile_h);
 	//get the tile type at the given location
-	char type = get_tile_type_at(x, y);
+	TileType type = get_tile_type_at(x, y, offset_x, offset_y);
 
-	//return the tile
-	return Tile(type, x_con, y_con, tile_w, tile_h);
+	if (type.identifier != NULL) {
+		return Tile(type, x_con, y_con, tile_w, tile_h);
+	} else {
+		return Tile(TileType(), x_con, y_con, tile_w, tile_h);
+	}
 }

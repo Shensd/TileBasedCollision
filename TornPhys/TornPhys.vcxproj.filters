@@ -27,6 +27,12 @@
     <ClCompile Include="window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="tile_type.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="player.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tile.hpp">
@@ -36,6 +42,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="window.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tile_type.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="player.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

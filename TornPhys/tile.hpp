@@ -2,11 +2,13 @@
 #ifndef TILE_HPP
 #define TILE_HPP
 
+#include "tile_type.hpp"
+
 class Tile {
 public:
-	char type;
+	TileType type;
 	float x, y, w, h;
-	Tile(char, float, float, float, float);
+	Tile(TileType, float, float, float, float);
 	Tile();
 };
 

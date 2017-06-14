@@ -1,3 +1,13 @@
+// TODO
+/*
+ * Add map transitions
+ * Add more flexiblity in physics engine
+ * Clean up various files
+ * Add more variety to types of maps loaded, possibly menus
+ * Improve player movement
+ * Add entities more than just the player
+ */
+
 #include <allegro5\allegro.h>
 #include <allegro5\allegro_color.h>
 #include <allegro5\allegro_primitives.h>
@@ -8,6 +18,8 @@
 #include "window.hpp"
 #include "map.hpp"
 #include "tile.hpp"
+#include "tile_type.hpp"
+#include "player.hpp"
 
 //toggle debug modes
 //#define H_DEBUG //used for horizontal debug
@@ -39,17 +51,6 @@ struct rect {
 	}
 };
 
-//player struct, auto create obj_player
-struct player {
-	bool jumping;
-	float speed, gravity;
-	float jump_height;
-	float x, y, w, h;
-	float vel_x, vel_y;
-	float max_vel_x, max_vel_y;
-} obj_player;
-
-
 //slow the game down for closer inspection when in time debug mode
 #ifdef TIME_DEBUG
 Window window(640, 480, "Game Window", float(1.0 / 30.0));
@@ -58,36 +59,42 @@ Window window(640, 480, "Game Window", float(1.0 / 120.0));
 #endif
 //init the map variables
 Map map1("map1.txt", 16, 16);
-Map map2("map1.txt", 16, 16);
+Map map2("map2.txt", 16, 16);
 Map *current_map;
 
 //create render queue vector
 std::vector<rect> render_queue;
 
+Player player;
+
+float map_offset_x = 0, map_offset_y = -240;
+
 //add key listeners to window
 void add_key_listeners() {
 	window.add_key_event(ALLEGRO_KEY_A, []() {
-		obj_player.vel_x = -obj_player.speed;
+		player.vel_x = -player.speed;
 	}, []() {
-		if (obj_player.vel_x == -obj_player.speed) {
-			obj_player.vel_x = 0;
+		if (player.vel_x == -player.speed) {
+			player.vel_x = 0;
 		}
 	});
 	window.add_key_event(ALLEGRO_KEY_D, []() {
-		obj_player.vel_x = obj_player.speed;
+		player.vel_x = player.speed;
 	}, []() {
-		if (obj_player.vel_x == obj_player.speed) {
-			obj_player.vel_x = 0;
+		if (player.vel_x == player.speed) {
+			player.vel_x = 0;
 		}
 	});
 	window.add_key_event(ALLEGRO_KEY_SPACE, []() {
-		if (!obj_player.jumping) {
-			obj_player.jumping = true;
-			obj_player.vel_y = obj_player.jump_height;
+		if (!player.jumping) {
+			player.jumping = true;
+			player.falling = false;
+			player.vel_y = player.jump_height;
 		}
 	}, []() {
-		if (obj_player.jumping) {
-			obj_player.vel_y *= 0.5;
+		if (player.jumping && !player.falling) {
+			player.falling = true;
+			player.vel_y -= (player.vel_y / 2);
 		}
 	});
 }
@@ -102,163 +109,16 @@ rect tile_to_rect(Tile tile) {
 	return r;
 }
 
-void horizontal() {
-	//First test if the horizontal velocity is non-zero
-	if (obj_player.vel_x != 0) {
-		//Add an offset so the tiles used for collision are better centered
-		int offset_wall = 0, offset_floor = obj_player.w / 2;
-		if (obj_player.vel_x > 0) {
-			offset_wall = obj_player.w; //For some reason this value needs to be higher when going to the right (probably rounding down)
-		}
-
-		//Find the corresponding tiles 
-		Tile top = current_map->get_tile_at(obj_player.x + obj_player.vel_x + offset_wall, obj_player.y + (obj_player.h / 2));
-		Tile bottom = current_map->get_tile_at(obj_player.x + obj_player.vel_x + offset_wall, obj_player.y - (obj_player.h / 2));
-		Tile floor_left = current_map->get_tile_at(obj_player.x + offset_floor + obj_player.vel_x + (obj_player.w / 2), obj_player.y + obj_player.h);
-		Tile floor_right = current_map->get_tile_at(obj_player.x + offset_floor + obj_player.vel_x - (obj_player.w / 2), obj_player.y + obj_player.h);
-
-		//Render these tiles if in horizontal debug mode
-#ifdef H_DEBUG
-		render_queue.push_back(tile_to_rect(top));
-		render_queue.push_back(tile_to_rect(bottom));
-		render_queue.push_back(tile_to_rect(floor_left));
-		render_queue.push_back(tile_to_rect(floor_right));
-#endif
-		//Test if the wall tiles in the direction they are going are solid
-		if (top.type == current_map->solid ||
-			bottom.type == current_map->solid) {
-			//if they are set the velocity to 0 and align them with the tile that is solid
-			obj_player.vel_x = 0;
-
-			Tile wall = (top.type == current_map->solid ? top : bottom);
-			//Render which tile is solid when in horizontal debug mode
-#ifdef H_DEBUG
-			rect wall_rect = tile_to_rect(wall);
-			wall_rect.color = al_map_rgb(255, 0, 0);
-			render_queue.push_back(wall_rect);
-#endif
-			//align them with solid tile
-			if (obj_player.vel_x > 0) { //moving right
-				obj_player.x = wall.x - obj_player.w;
-			} else if (obj_player.vel_x < 0) { //moving left
-				obj_player.x = wall.x;
-			}
-		}
-		//if there isn't any solid tiles below them set jumping to true to have them fall
-		if (floor_right.type != current_map->solid &&
-			floor_left.type != current_map->solid) {
-			obj_player.jumping = true;
-		}
-	}
-
-	//add velocity to position
-	obj_player.x += obj_player.vel_x;
-}
-
-void vertical() {
-	//test if player is jumping
-	if (obj_player.jumping) {
-		//Add an offset to better orient collision tiles
-		int offset = obj_player.w / 2;
-
-		//Select corresponding tiles
-		Tile floor_left = current_map->get_tile_at(obj_player.x + offset + obj_player.vel_x + (obj_player.w / 2), obj_player.y + obj_player.h);
-		Tile floor_right = current_map->get_tile_at(obj_player.x + offset + obj_player.vel_x - (obj_player.w / 2), obj_player.y + obj_player.h);
-		Tile ceiling_left = current_map->get_tile_at(obj_player.x + offset + obj_player.vel_x + (obj_player.w / 2), obj_player.y - obj_player.h);
-		Tile ceiling_right = current_map->get_tile_at(obj_player.x + offset + obj_player.vel_x - (obj_player.w / 2), obj_player.y - obj_player.h);
-
-		//Render them if in vertical debug mode
-#ifdef V_DEBUG
-		render_queue.push_back(tile_to_rect(ceiling_left));
-		render_queue.push_back(tile_to_rect(ceiling_right));
-		render_queue.push_back(tile_to_rect(floor_left));
-		render_queue.push_back(tile_to_rect(floor_right));
-#endif
-
-		if (obj_player.vel_y < 0) { //going up
-			if (ceiling_right.type == current_map->solid ||
-				ceiling_left.type == current_map->solid) {
-				//test if either of the tile above them are solid
-				Tile ceiling = (ceiling_left.type == current_map->solid ? ceiling_left : ceiling_right);
-
-				if (ceiling_right.type == current_map->solid &&
-					ceiling_left.type == current_map->solid) { //Both are solid, not suspicious
-					obj_player.vel_y = 0;
-
-					obj_player.y = ceiling.y + ceiling.h;
-				} else { //only one is solid, double check if wall 
-					Tile wall_up = current_map->get_tile_at(ceiling.x, ceiling.y + ceiling.h);
-					if (wall_up.type != current_map->solid) { //it is not a wall, fall
-						obj_player.vel_y = 0;
-
-						obj_player.y = ceiling.y + ceiling.h;
-					}
-				}
-
-				//render the solid ceiling tile if in vertical debug mode
-#ifdef V_DEBUG
-				rect ceiling_rect = tile_to_rect(ceiling);
-				ceiling_rect.color = al_map_rgb(255, 0, 0);
-				render_queue.push_back(ceiling_rect);
-#endif
-			}
-		} else if (obj_player.vel_y > 0) { //going down
-			if (floor_right.type == current_map->solid ||
-				floor_left.type == current_map->solid) {
-				//check if with of the floor tiles are solid
-				Tile floor = (floor_left.type == current_map->solid ? floor_left : floor_right);
-
-				if (floor_right.type == current_map->solid &&
-					floor_left.type == current_map->solid) { //if both of the tiles are solid then they are definitely on a floor
-					obj_player.vel_y = 0; //cancel their velocity and set jumping to false
-					obj_player.jumping = false;
-
-					obj_player.y = floor.y - obj_player.h; //align them with the floor
-				} else { // only one tile is solid, check if it is a wall
-					Tile wall_up = current_map->get_tile_at(floor.x, floor.y - floor.h); //get the tile immediatley above the single tile that is solid
-					//render it if vertical debug is on
-#ifdef V_DEBUG
-					rect wall_up_rect = tile_to_rect(wall_up);
-					wall_up_rect.color = al_map_rgb(0, 0, 255);
-					render_queue.push_back(wall_up_rect);
-#endif 
-					//if the tile immeditely above the single solid tile is not solid then it is not a wall
-					if (wall_up.type != current_map->solid) { 
-						//cancel their velocity and set them on the tile
-						obj_player.vel_y = 0;
-						obj_player.jumping = false;
-
-						obj_player.y = floor.y - obj_player.h;
-					}
-				}
-				//render some of the tiles if in vertical debug mode
-#ifdef V_DEBUG
-				rect floor_rect = tile_to_rect(floor);
-				floor_rect.color = al_map_rgb(255, 0, 0);
-				render_queue.push_back(floor_rect);
-#endif
-			} 
-		}
-		//add the velocity to the player's gravity
-		obj_player.vel_y += obj_player.gravity;
-	} else {
-		//just to cover all bases, set the velocity to 0 if they are not jumping
-		obj_player.vel_y = 0;
-	}
-
-	//add the y velocty to their position
-	obj_player.y += obj_player.vel_y;
-}
-
 void collision() {
-	//calculate horizontal and vertical collision
-	horizontal();
-	vertical();
+	player.update_collision();
+	map_offset_x -= player.vel_x;
+	map_offset_y -= player.vel_y;
 }
 
 void render() {
+	al_clear_to_color(al_map_rgb(255, 255, 255));
 	//render the current map with no offset
-	current_map->render_map(0, 0);
+	current_map->render_map(map_offset_x, 0);
 	//go through render queue and render each item
 	for (unsigned int i = 0; i < render_queue.size(); i++) {
 		rect r = render_queue.at(i);
@@ -275,10 +135,10 @@ void game_loop() {
 
 	//create the player rectangle and add it to the render queue
 	rect player_rect;
-	player_rect.x1 = obj_player.x;
-	player_rect.y1 = obj_player.y;
-	player_rect.x2 = obj_player.x + obj_player.w;
-	player_rect.y2 = obj_player.y + obj_player.h;
+	player_rect.x1 = 320;
+	player_rect.y1 = player.y;
+	player_rect.x2 = player_rect.x1 + player.w;
+	player_rect.y2 = player_rect.y1 + player.h;
 	player_rect.color = al_map_rgb(0, 255, 100);
 	render_queue.push_back(player_rect);
 
@@ -288,23 +148,40 @@ void game_loop() {
 
 void init_game() {
 	//set the current map
-	current_map = &map1;
 
+	TileType solid('1', true, al_map_rgb(0, 0, 0));
+	TileType spawn('2', false, al_map_rgb(255, 255, 255));
+	spawn.is_spawn = true;
+	spawn.draw_wireframe = true;
+
+	//add tile types
+	map1.add_tile_type(TileType('0', false, al_map_rgb(255, 255, 255)));
+	map1.add_tile_type(solid);
+	map1.add_tile_type(spawn);
+	map1.parse_map();
+
+	TileType map_trans('A', false, al_map_rgb(244, 237, 105));
+	map_trans.add_exec([]() {
+		current_map = &map1;
+		player.x = current_map->spawn_x;
+		player.y = current_map->spawn_y;
+		player.current_map = current_map;
+		map_offset_x = 320 - current_map->spawn_x;
+	});
+
+	map2.add_tile_type(TileType('0', false, al_map_rgb(255, 255, 255)));
+	map2.add_tile_type(TileType('1', true, al_map_rgb(255, 0, 0)));
+	map2.add_tile_type(spawn);
+	map2.add_tile_type(map_trans);
+	map2.parse_map();
+
+	current_map = &map2;
+
+	map_offset_x = 320 - current_map->spawn_x;
+	//map_offset_y = 0;
 
 	//init the player's variables
-	obj_player.w = 16;
-	obj_player.h = 16;
-
-	obj_player.x = current_map->spawn_x;
-	obj_player.y = current_map->spawn_y;
-
-	obj_player.speed = 2.5;
-	obj_player.gravity = 0.2;
-
-	obj_player.jump_height = -8;
-
-	obj_player.max_vel_x = 2000;
-	obj_player.max_vel_y = 2000;
+	player = Player(current_map->spawn_x, current_map->spawn_y, 16, 16, 2.5F, 0.2F, 8, current_map);
 
 	window.start_game_loop(&game_loop);
 }

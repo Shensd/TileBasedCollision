@@ -129,12 +129,16 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="map.cpp" />
+    <ClCompile Include="player.cpp" />
     <ClCompile Include="tile.cpp" />
+    <ClCompile Include="tile_type.cpp" />
     <ClCompile Include="window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="map.hpp" />
+    <ClInclude Include="player.hpp" />
     <ClInclude Include="tile.hpp" />
+    <ClInclude Include="tile_type.hpp" />
     <ClInclude Include="window.hpp" />
   </ItemGroup>
   <ItemGroup>
