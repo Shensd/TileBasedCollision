@@ -63,7 +63,7 @@ void Map::render_map(float offset_x, float offset_y) {
 		throw std::runtime_error("Map has not been parsed! call parse_map to parse.");
 	}
 	
-	
+	al_hold_bitmap_drawing(true);
 
 	for (int i = 0; i < max_h; i++) {
 		for (int j = 0; j < max_w; j++) {
@@ -79,10 +79,6 @@ void Map::render_map(float offset_x, float offset_y) {
 				if (tile_types.at(k).identifier == tile) {
 					temp = tile_types.at(k);
 				}
-			}
-			
-			if (!temp.has_color && !temp.has_image) {
-				//return;
 			}
 
 			if (temp.identifier == NULL) {
@@ -109,6 +105,8 @@ void Map::render_map(float offset_x, float offset_y) {
 			}
 		}
 	}
+
+	al_hold_bitmap_drawing(false);
 }
 
 //used to get the tile type at a given location

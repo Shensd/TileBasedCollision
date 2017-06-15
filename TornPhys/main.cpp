@@ -12,8 +12,6 @@
 #include <allegro5\allegro_color.h>
 #include <allegro5\allegro_primitives.h>
 #include <allegro5\allegro_image.h>
-#include <allegro5\allegro_font.h>
-#include <allegro5\allegro_ttf.h>
 
 #include <vector>
 #include <iostream>
@@ -152,6 +150,14 @@ void game_loop() {
 	render();
 }
 
+void transition_map(Map* to) {
+	current_map = to;
+	player.x = current_map->spawn_x;
+	player.y = current_map->spawn_y;
+	player.current_map = current_map;
+	map_offset_x = 320 - current_map->spawn_x;
+}
+
 void init_game() {
 	char* path_stone = "stone.png";
 	char* path_grass = "grass.png";
@@ -160,32 +166,20 @@ void init_game() {
 	TileType map_trans_1('A', false);
 	map_trans_1.add_exec([]() {
 		visited = true;
-		current_map = maps.at(0);
-		player.x = current_map->spawn_x;
-		player.y = current_map->spawn_y;
-		player.current_map = current_map;
-		map_offset_x = 320 - current_map->spawn_x;
+		transition_map(maps.at(0));
 	});
 	map_trans_1.add_color(al_map_rgb(244, 237, 105));
 
 	TileType map_trans_2('B', false);
 	map_trans_2.add_exec([]() {
-		current_map = maps.at(1);
-		player.x = current_map->spawn_x;
-		player.y = current_map->spawn_y;
-		player.current_map = current_map;
-		map_offset_x = 320 - current_map->spawn_x;
+		transition_map(maps.at(1));
 	});
 	map_trans_2.add_color(al_map_rgb(244, 237, 105));
 
 	TileType map_trans_3('C', false);
 	map_trans_3.add_exec([]() {
 		if (visited) {
-			current_map = maps.at(2);
-			player.x = current_map->spawn_x;
-			player.y = current_map->spawn_y;
-			player.current_map = current_map;
-			map_offset_x = 320 - current_map->spawn_x;
+			transition_map(maps.at(2));
 		}
 	});
 	map_trans_3.add_color(al_map_rgb(244, 237, 105));
@@ -195,7 +189,6 @@ void init_game() {
 	solid_stone.add_texture(path_stone);
 	TileType spawn('2', false);
 	spawn.is_spawn = true;
-	spawn.draw_wireframe = true;
 	TileType solid_dirt('3', true);
 	solid_dirt.add_texture(path_dirt);
 	TileType air_grass('4', false);

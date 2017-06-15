@@ -52,9 +52,6 @@ Window::Window(int height, int width, char* title, float fps) {
 	if (!al_init_image_addon()) {
 		throw std::runtime_error("Unable to init image addon");
 	}
-
-	//Other settings
-	al_hold_bitmap_drawing(true);
 }
 
 //start the game loop with the function given
