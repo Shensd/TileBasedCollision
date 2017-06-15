@@ -5,6 +5,7 @@
 #include <allegro5\allegro.h>
 #include <allegro5\allegro_color.h>
 #include <allegro5\allegro_primitives.h>
+#include <allegro5\allegro_image.h>
 
 #include <iostream>
 
@@ -14,11 +15,11 @@
 
 class Window {
 public:
-	int height, width;
+	int height, width, temp_fps = 0, fps = 0;
 	char* title;
 	ALLEGRO_DISPLAY* display = NULL;
 	ALLEGRO_EVENT_QUEUE *event_queue = NULL;
-	ALLEGRO_TIMER *timer = NULL;
+	ALLEGRO_TIMER *timer = NULL, *fps_timer = NULL;
 	ALLEGRO_THREAD *thread = NULL;
 	std::vector<std::pair<int, void(*)(void)>> key_down_callbacks;
 	std::vector<std::pair<int, void(*)(void)>> key_up_callbacks;

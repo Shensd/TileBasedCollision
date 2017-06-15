@@ -11,9 +11,13 @@
 #include <allegro5\allegro.h>
 #include <allegro5\allegro_color.h>
 #include <allegro5\allegro_primitives.h>
+#include <allegro5\allegro_image.h>
+#include <allegro5\allegro_font.h>
+#include <allegro5\allegro_ttf.h>
 
 #include <vector>
 #include <iostream>
+#include <stdexcept>
 
 #include "window.hpp"
 #include "map.hpp"
@@ -58,16 +62,18 @@ Window window(640, 480, "Game Window", float(1.0 / 30.0));
 Window window(640, 480, "Game Window", float(1.0 / 120.0));
 #endif
 //init the map variables
-Map map1("map1.txt", 16, 16);
-Map map2("map2.txt", 16, 16);
 Map *current_map;
+
 
 //create render queue vector
 std::vector<rect> render_queue;
+std::vector<Map*> maps = { new Map("map1.txt", 16, 16), new Map("map2.txt", 16, 16), new Map("map3.txt", 16, 16) };
 
 Player player;
 
 float map_offset_x = 0, map_offset_y = -240;
+
+bool visited = false;
 
 //add key listeners to window
 void add_key_listeners() {
@@ -118,13 +124,13 @@ void collision() {
 void render() {
 	al_clear_to_color(al_map_rgb(255, 255, 255));
 	//render the current map with no offset
-	current_map->render_map(map_offset_x, 0);
 	//go through render queue and render each item
 	for (unsigned int i = 0; i < render_queue.size(); i++) {
 		rect r = render_queue.at(i);
 		al_draw_rectangle(r.x1, r.y1, r.x2, r.y2, r.color, 2.0);
 	}
-	//flip display and empty the render queue
+	current_map->render_map(map_offset_x, 0);
+
 	al_flip_display();
 	render_queue.clear();
 }
@@ -147,35 +153,70 @@ void game_loop() {
 }
 
 void init_game() {
-	//set the current map
+	char* path_stone = "stone.png";
+	char* path_grass = "grass.png";
+	char* path_dirt = "dirt.png";
 
-	TileType solid('1', true, al_map_rgb(0, 0, 0));
-	TileType spawn('2', false, al_map_rgb(255, 255, 255));
-	spawn.is_spawn = true;
-	spawn.draw_wireframe = true;
-
-	//add tile types
-	map1.add_tile_type(TileType('0', false, al_map_rgb(255, 255, 255)));
-	map1.add_tile_type(solid);
-	map1.add_tile_type(spawn);
-	map1.parse_map();
-
-	TileType map_trans('A', false, al_map_rgb(244, 237, 105));
-	map_trans.add_exec([]() {
-		current_map = &map1;
+	TileType map_trans_1('A', false);
+	map_trans_1.add_exec([]() {
+		visited = true;
+		current_map = maps.at(0);
 		player.x = current_map->spawn_x;
 		player.y = current_map->spawn_y;
 		player.current_map = current_map;
 		map_offset_x = 320 - current_map->spawn_x;
 	});
+	map_trans_1.add_color(al_map_rgb(244, 237, 105));
 
-	map2.add_tile_type(TileType('0', false, al_map_rgb(255, 255, 255)));
-	map2.add_tile_type(TileType('1', true, al_map_rgb(255, 0, 0)));
-	map2.add_tile_type(spawn);
-	map2.add_tile_type(map_trans);
-	map2.parse_map();
+	TileType map_trans_2('B', false);
+	map_trans_2.add_exec([]() {
+		current_map = maps.at(1);
+		player.x = current_map->spawn_x;
+		player.y = current_map->spawn_y;
+		player.current_map = current_map;
+		map_offset_x = 320 - current_map->spawn_x;
+	});
+	map_trans_2.add_color(al_map_rgb(244, 237, 105));
 
-	current_map = &map2;
+	TileType map_trans_3('C', false);
+	map_trans_3.add_exec([]() {
+		if (visited) {
+			current_map = maps.at(2);
+			player.x = current_map->spawn_x;
+			player.y = current_map->spawn_y;
+			player.current_map = current_map;
+			map_offset_x = 320 - current_map->spawn_x;
+		}
+	});
+	map_trans_3.add_color(al_map_rgb(244, 237, 105));
+
+	TileType air('0', false);
+	TileType solid_stone('1', true);
+	solid_stone.add_texture(path_stone);
+	TileType spawn('2', false);
+	spawn.is_spawn = true;
+	spawn.draw_wireframe = true;
+	TileType solid_dirt('3', true);
+	solid_dirt.add_texture(path_dirt);
+	TileType air_grass('4', false);
+	air_grass.add_texture(path_grass);
+	TileType solid_grass('5', true);
+	solid_grass.add_texture(path_grass);
+
+	for (int i = 0; i < maps.size(); i++) {
+		maps.at(i)->add_tile_type(air);
+		maps.at(i)->add_tile_type(solid_stone);
+		maps.at(i)->add_tile_type(solid_grass);
+		maps.at(i)->add_tile_type(solid_dirt);
+		maps.at(i)->add_tile_type(air_grass);
+		maps.at(i)->add_tile_type(spawn);
+		maps.at(i)->add_tile_type(map_trans_1);
+		maps.at(i)->add_tile_type(map_trans_2);
+		maps.at(i)->add_tile_type(map_trans_3);
+		maps.at(i)->parse_map();
+	}
+
+	current_map = maps.at(1);
 
 	map_offset_x = 320 - current_map->spawn_x;
 	//map_offset_y = 0;

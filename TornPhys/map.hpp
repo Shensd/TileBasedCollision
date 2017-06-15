@@ -25,6 +25,7 @@ public:
 	float spawn_x, spawn_y;
 	float tile_w, tile_h;
 	char air, solid, spawn;
+	ALLEGRO_COLOR backdrop = al_map_rgb(255, 255, 255);
 	Map(char*, float, float);
 	void add_tile_type(TileType);
 	void render_map(float = 0, float = 0);

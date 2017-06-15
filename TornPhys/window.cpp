@@ -26,6 +26,7 @@ Window::Window(int height, int width, char* title, float fps) {
 	//init event_queue and timer
 	Window::event_queue = al_create_event_queue();
 	Window::timer = al_create_timer(fps);
+	Window::fps_timer = al_create_timer(1);
 
 	//double check they are valid
 	if (!Window::event_queue) {
@@ -34,16 +35,26 @@ Window::Window(int height, int width, char* title, float fps) {
 	if (!Window::timer) {
 		throw std::runtime_error("Unable to create timer");
 	}
+	if (!Window::fps_timer) {
+		throw std::runtime_error("Unable to create timer");
+	}
 
 	//register the event sources
 	al_register_event_source(event_queue, al_get_display_event_source(Window::display));
 	al_register_event_source(event_queue, al_get_timer_event_source(Window::timer));
+	al_register_event_source(event_queue, al_get_timer_event_source(Window::fps_timer));
 	al_register_event_source(event_queue, al_get_keyboard_event_source());
-
+	
 	//init primitives
 	if (!al_init_primitives_addon()) { 
 		throw std::runtime_error("Unable to init primitives addon");
 	}
+	if (!al_init_image_addon()) {
+		throw std::runtime_error("Unable to init image addon");
+	}
+
+	//Other settings
+	al_hold_bitmap_drawing(true);
 }
 
 //start the game loop with the function given
@@ -54,10 +65,13 @@ void Window::start_game_loop(void(*fptr)(void)) {
 
 	//start the timer
 	al_start_timer(timer);
+	al_start_timer(fps_timer);
 
 	while (!done) {
 		//set redraw to false by default
-		bool redraw = false;
+		bool redraw = false, fps = false;
+
+		Window::temp_fps++;
 
 		//done this way to process multiple events at once
 		while (!al_is_event_queue_empty(event_queue)) {
@@ -69,7 +83,11 @@ void Window::start_game_loop(void(*fptr)(void)) {
 				break;
 			case ALLEGRO_EVENT_TIMER:
 				//if the timer goes off then set redraw to true and call given function
-				redraw = true;
+				if (events.timer.source == Window::timer) {
+					redraw = true;
+				} else {
+					fps = true;
+				}
 				break;
 			case ALLEGRO_EVENT_KEY_DOWN:
 				//run all the key down events when a key is pressed
@@ -93,6 +111,10 @@ void Window::start_game_loop(void(*fptr)(void)) {
 		if (redraw) {
 			//call given function
 			fptr();
+		}
+		if (fps) {
+			Window::fps = Window::temp_fps;
+			Window::temp_fps = 0;
 		}
 	}
 }
